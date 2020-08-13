@@ -1,31 +1,37 @@
 import cv2
 import getpass
+from PIL import Image
+from colorbilndProcessor import ColorBlindConverter, cb_types
 import time
 import os
 import numpy as np
 
 cap = cv2.VideoCapture(0)
 flag = True
-newColorRange = [255, 255, 255] #B, G, R
 
-def processFrame(frame, newRange):
-    wMax, hMax = frame.shape[:2]
+def processFrame(frame):
+    pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
 
-    processed = frame.copy()
+    converter = ColorBlindConverter(pil_image)
+    mode = 'Deuteranopia'
+    if (mode in cb_types.keys()):
+        converter.convert(mode)
 
-    for w in range(wMax):
-        for h in range(hMax):
-            processed[w, h, 0] = int(frame[w, h, 0] * newRange[0] / 255) #B
-            processed[w, h, 1] = int(frame[w, h, 0] * newRange[1] / 255) #G
-            processed[w, h, 2] = int(frame[w, h, 0] * newRange[2] / 255) #R
+    processed = converter.getImage()
 
-    return processed
+    # use numpy to convert the pil_image into a numpy array
+    numpy_image = np.array(processed)
 
-counter = 0
+    # convert to a openCV2 image, notice the COLOR_RGB2BGR which means that
+    # the color is converted from RGB to BGR format
+    opencv_image = cv2.cvtColor(numpy_image, cv2.COLOR_RGB2BGR)
+
+    return opencv_image
+
 while(True):
     ret, frame = cap.read(1)
 
-    newFrame = processFrame(frame, newColorRange)
+    newFrame = processFrame(frame)
 
     cv2.imshow('frame',newFrame)
 
@@ -35,10 +41,11 @@ while(True):
 
     path = 'C:/Users/Liuyc/Desktop/Trial/xdd.jpg'
     cv2.imwrite(path, frame)
-    counter += 1
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
+
+
 
 cap.release()
 cv2.destroyAllWindows()
