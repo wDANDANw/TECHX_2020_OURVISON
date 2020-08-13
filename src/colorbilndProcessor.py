@@ -30,6 +30,11 @@ import numpy as np
 import os
 from PIL import Image
 
+import pycuda.driver as cuda
+from pycuda.compiler import SourceModule
+# from pycuda import compiler, gpuarray, tools
+import pycuda.autoinit
+
 cb_types = {
     'Normal': '(normal vision)',
     'Protanopia': '(red-blind)',
@@ -201,6 +206,8 @@ class ColorBlindConverter(object):
     def _convert_monochrome(self):
         image_new = Image.new("RGB", (self.width, self.height), "white")
         p_new = image_new.load()
+
+        # self._convert_monochrome_gpu(self.image)
         for i in range(self.width):
             for j in range(self.height):
                 p_old = self.image.getpixel((i,j))
@@ -211,6 +218,65 @@ class ColorBlindConverter(object):
                 p_new[i,j] = (int(g_new), int(g_new), int(g_new))
         self.image = image_new
         return
+
+    def _convert_monochrome_gpu(self, image):
+        np_img = np.array(image)
+        width, height = image.size
+        total = width * height
+
+        # ------------------------------------------------
+        # accelerate the following part as much as possible using GPU
+        #
+        # compute histograms for RGB components separately
+        # the value range for each pixel is [0,255]
+        hist_rgb = [0] * 256
+
+        print(hist_rgb)
+
+        # hist_rgb_buffer = numpy.float32(hist_rgb)
+        # pix = pix.astype(numpy.uint8)
+        #
+        # hist_rgb_gpu = cuda.mem_alloc(hist_rgb_buffer.nbytes)
+        # pix_gpu = cuda.mem_alloc(pix.nbytes)
+        #
+        # cuda.memcpy_htod(hist_rgb_gpu, hist_rgb_buffer)
+        # cuda.memcpy_htod(pix_gpu, pix)
+        #
+        # histograms(hist_rgb_gpu, pix_gpu,
+        #            numpy.int32(total),
+        #            block=(THREADS_PER_BLOCK, 1, 1),
+        #            grid=((total + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, 1))
+        #
+        # cuda.memcpy_dtoh(hist_rgb_buffer, hist_rgb_gpu)
+        #
+        # hist_rgb = hist_rgb_buffer
+        #
+        # # compute the accumulative histograms
+        # for intensity in range(1, 256):
+        #     temp = hist_rgb[intensity] + hist_rgb[intensity - 1]
+        #     # take care of rounding error
+        #     temp = min(temp, 256 - 1)
+        #     hist_rgb[intensity] = temp
+        #
+        # # enhance the picture according to the inversed histgram
+        # cuda.memcpy_htod(hist_rgb_gpu, hist_rgb)
+        #
+        # enhance(pix_gpu, hist_rgb_gpu,
+        #         numpy.int32(total),
+        #         block=(THREADS_PER_BLOCK, 1, 1),
+        #         grid=((total + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, 1))
+        #
+        # cuda.memcpy_dtoh(pix, pix_gpu)
+        # # -----------------------------------------------
+        #
+        # # save the picture
+        # pic = Image.fromarray(pix)
+        # return pic
+
+        gpu_code = '''
+            
+        '''
+
 
     def getImage(self):
         return self.image

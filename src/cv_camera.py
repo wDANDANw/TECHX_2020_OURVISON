@@ -6,7 +6,7 @@ import time
 import os
 import numpy as np
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 flag = True
 
 def processFrame(frame):
