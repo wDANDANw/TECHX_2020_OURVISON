@@ -30,8 +30,10 @@ import numpy as np
 import os
 from PIL import Image
 
-import pycuda.driver as cuda
+import pycuda.driver as drv
 from pycuda.compiler import SourceModule
+
+import time
 # from pycuda import compiler, gpuarray, tools
 import pycuda.autoinit
 
@@ -45,6 +47,45 @@ cb_types = {
     'Tritanomaly': '(blue-weak)',
     'Monochromacy': '(totally colorblind)'
 }
+
+# Somehow the path variable cannot be set
+import os
+if (os.system("cl.exe")):
+    os.environ['PATH'] += ';'+r"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\14.21.27702\bin\Hostx64\x64"
+if (os.system("cl.exe")):
+    raise RuntimeError("cl.exe still not found, path probably incorrect")
+
+gpu_code_template = '''
+#include<stdio.h>
+#define INDEX(a, b) a * 480 + b
+#define R_INDEX(a, b) a * 480 * 3 + b * 3
+#define G_INDEX(a, b) a * 480 * 3 + b * 3 + 1
+#define B_INDEX(a, b) a * 480 * 3 + b * 3 + 2
+
+__global__ void rgb2gray(float *dest,float *r_img, float *g_img, float *b_img) {
+
+    unsigned int idx = threadIdx.x+(blockIdx.x*(blockDim.x*blockDim.y));
+
+      unsigned int a = idx/480;
+      unsigned int b = idx%480;
+
+    float value = (0.299*r_img[INDEX(a, b)]+0.587*g_img[INDEX(a, b)]+0.114*b_img[INDEX(a, b)]);
+    // dest[INDEX(a, b)] = value;       
+    dest[R_INDEX(a, b)] = value;       
+    // dest[R_INDEX(a, b)] = value;
+    dest[G_INDEX(a, b)] = value;
+    dest[B_INDEX(a, b)] = value;
+    // dest[R_INDEX(a, b)] = 255;
+    // dest[G_INDEX(a, b)] = 255;
+    // dest[B_INDEX(a, b)] = 255;
+}
+'''
+
+# gpu_code = gpu_code_template % {
+#     'ROW_NUM': ROW_NUM
+# }
+
+mod = SourceModule(gpu_code_template)  # Somehow this step is lagging
 
 class ColorBlindConverter(object):
 
@@ -207,7 +248,8 @@ class ColorBlindConverter(object):
         image_new = Image.new("RGB", (self.width, self.height), "white")
         p_new = image_new.load()
 
-        # self._convert_monochrome_gpu(self.image)
+        print(self.image)
+
         for i in range(self.width):
             for j in range(self.height):
                 p_old = self.image.getpixel((i,j))
@@ -217,22 +259,25 @@ class ColorBlindConverter(object):
                 g_new = (r_old * 0.299) + (g_old * 0.587) + (b_old * 0.114)
                 p_new[i,j] = (int(g_new), int(g_new), int(g_new))
         self.image = image_new
+
+        # self._convert_monochrome_gpu()
+
         return
 
-    def _convert_monochrome_gpu(self, image):
-        np_img = np.array(image)
-        width, height = image.size
-        total = width * height
-
-        # ------------------------------------------------
-        # accelerate the following part as much as possible using GPU
+    def _convert_monochrome_gpu(self):
+        # np_img = np.array(image)
+        # width, height = image.size
+        # total = width * height
         #
-        # compute histograms for RGB components separately
-        # the value range for each pixel is [0,255]
-        hist_rgb = [0] * 256
-
-        print(hist_rgb)
-
+        # # ------------------------------------------------
+        # # accelerate the following part as much as possible using GPU
+        # #
+        # # compute histograms for RGB components separately
+        # # the value range for each pixel is [0,255]
+        # hist_rgb = [0] * 256
+        #
+        # print(hist_rgb)
+        #
         # hist_rgb_buffer = numpy.float32(hist_rgb)
         # pix = pix.astype(numpy.uint8)
         #
@@ -273,9 +318,38 @@ class ColorBlindConverter(object):
         # pic = Image.fromarray(pix)
         # return pic
 
-        gpu_code = '''
-            
-        '''
+        img_np_array = np.array(self.image)
+        print(img_np_array.shape)
+
+        # r_img = img_np_array[:, :, 0].reshape(307200, order='F')
+        # g_img = img_np_array[:, :, 1].reshape(307200, order='F')
+        # b_img = img_np_array[:, :, 2].reshape(307200, order='F')
+
+        # TODO: DELETE
+        # TESTING IMG WITH 480 x 480 dim
+        r_img = img_np_array[:, :, 0].reshape(230400, order='F')
+        g_img = img_np_array[:, :, 1].reshape(230400, order='F')
+        b_img = img_np_array[:, :, 2].reshape(230400, order='F')
+
+        # r_img = np.reshape(r_img, (480, 480), order='F')
+        # print(np.shape(r_img))
+        # self.image = Image.fromarray(np.uint8(r_img))
+        # return
+
+        ROW_NUM = r_img.shape[0]
+        # shape_1d = r_img.shape[0] * r_img.shape[1]
+        dest = img_np_array
+
+
+        rgb2gray = mod.get_function("rgb2gray")
+        rgb2gray(drv.Out(dest), drv.In(r_img), drv.In(g_img), drv.In(b_img), block=(1024, 1, 1), grid=(64, 1, 1))
+
+        dest = np.reshape(dest, (480, 480, 3), order='F')
+        print(np.shape(dest))
+
+        self.image = Image.fromarray(np.uint8(dest))
+        # print(np.shape(r_img))
+        # print(shape_1d)
 
 
     def getImage(self):
