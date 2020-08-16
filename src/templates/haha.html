@@ -3,17 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <title>Title</title>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/haha.js') }}"></script>
+<!--    <script type="text/javascript" src="{{ url_for('static', filename='js/haha.js') }}"></script>-->
 </head>
 <body>
 
 <div>
     {% extends "template.html" %}
     {% block content %}
-
-    <h1> My First Try Using Flask </h1>
-    <img id = "user image">
-
+    <img id = "user_image" src = "{{url_for('video_feed')}}">
     {% endblock %}
 </div>
 
