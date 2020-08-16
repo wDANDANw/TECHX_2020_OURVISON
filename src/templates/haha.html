@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/haha.js') }}"></script>
+</head>
+<body>
+
+<div style="text-align: center">
+    {% extends "template.html" %}
+    {% block content %}
+    <img id = "user_image" src = "{{url_for('video_feed')}}">
+    <audio id = "user_audio" autoplay="false">
+        <source src = "{{url_for('sound_feed')}}">
+    </audio>
+    {% endblock %}
+</div>
+
+
+</body>
+</html>
